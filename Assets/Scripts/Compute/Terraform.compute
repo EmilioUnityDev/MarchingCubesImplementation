@@ -16,7 +16,7 @@ float DistanceToHit(float3 p)
 
 float EaseOutExpo(float x)
 {
-    return x >= 1 ? 0 : 1 - pow(2.0f, 5.0f * (x - 1.0f));
+    return x >= 1 ? 0 : 1 - pow(2.0f, 10.0f * (x - 1.0f));
 }
 
 [numthreads(8,8,8)]

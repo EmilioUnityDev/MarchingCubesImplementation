@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
@@ -377,80 +378,93 @@ public class MeshGenerator : MonoBehaviour
 
     public void Terraform(float type, Vector3 hit)
     {
-        float time = Time.realtimeSinceStartup;
-
         DestroyAllSpheres(); // Clear existing spheres if any
 
-        // Obtain the chunk ID based on the hit position
-        Vector3Int chunkId = new Vector3Int(
-            Mathf.FloorToInt((hit.x - _chunkCollection.transform.position.x) / _chunkSize),
-            Mathf.FloorToInt((hit.y - _chunkCollection.transform.position.y) / _chunkSize),
-            Mathf.FloorToInt((hit.z - _chunkCollection.transform.position.z) / _chunkSize)
-        );
+        // Obtain the nearby chunk based on the hit position
+        Dictionary<Vector3Int, Chunk> chunkDict = new Dictionary<Vector3Int, Chunk>();
 
-        //Vector3Int chunkId = new Vector3Int(
-        //    Mathf.FloorToInt((hit.x) / _chunkSize),
-        //    Mathf.FloorToInt((hit.y) / _chunkSize),
-        //    Mathf.FloorToInt((hit.z) / _chunkSize)
-        //);
-
-        Debug.Log($"Terraforming chunk {chunkId} with type {type} at position {hit}.");
-        // Create a sphere at the hit position
-        //GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        //sphere.transform.position = hit;
-        //sphere.transform.localScale = Vector3.one * _radiusTerraform * 2; // Scale the sphere based on the terraform radius
-
-        // Check if the chunk exists
-        if (_chunks[chunkId.x, chunkId.y, chunkId.z] == null)
+        for (int x = -1; x <= 1; x++)
         {
-            Debug.LogWarning($"Chunk {chunkId} does not exist. Cannot terraform.");
-            return;
+            for (int y = -1; y <= 1; y++)
+            {
+                for (int z = -1; z <= 1; z++)
+                {
+                    // Calculate the nearby chunk ID based on the hit position, adding the offsets and dividing by the chunk size
+                    Vector3Int nearbyChunkId = new Vector3Int(
+                        Mathf.FloorToInt((hit.x + (x * _radiusTerraform) - _chunkCollection.transform.position.x) / _chunkSize),
+                        Mathf.FloorToInt((hit.y + (y * _radiusTerraform) - _chunkCollection.transform.position.y) / _chunkSize),
+                        Mathf.FloorToInt((hit.z + (z * _radiusTerraform) - _chunkCollection.transform.position.z) / _chunkSize)
+                    );
+
+                    // Clamp the nearby chunk ID to ensure it stays within the bounds of the chunks array
+                    Vector3Int fixedNearbyChunkId = new Vector3Int(
+                        Mathf.Clamp(nearbyChunkId.x, 0, _numChunks.x - 1),
+                        Mathf.Clamp(nearbyChunkId.y, 0, _numChunks.y - 1),
+                        Mathf.Clamp(nearbyChunkId.z, 0, _numChunks.z - 1)
+                    );
+
+                    // Try to add the nearby chunk to the dictionary if exists
+                    if (_chunks[fixedNearbyChunkId.x, fixedNearbyChunkId.y, fixedNearbyChunkId.z] != null &&
+                        !chunkDict.ContainsKey(fixedNearbyChunkId))
+                    {
+                        Debug.Log($"Adding nearby chunk {fixedNearbyChunkId} to the dictionary.");
+
+                        // Add the nearby chunk to the dictionary
+                        chunkDict[fixedNearbyChunkId] = _chunks[fixedNearbyChunkId.x, fixedNearbyChunkId.y, fixedNearbyChunkId.z];
+                    }
+                }
+            }
         }
 
-        Chunk chunk = _chunks[chunkId.x, chunkId.y, chunkId.z];
-
-        if (_pointsBuffer != null)
-            _pointsBuffer.Release();
-
-        // Initialize the compute buffer with the points data
-        _pointsBuffer = new ComputeBuffer(_numPointsPerAxis * _numPointsPerAxis * _numPointsPerAxis, sizeof(float) * 4);
-        _pointsBuffer.SetData(chunk.GetPoints());
-
-        // Set the compute shader parameters for terraforming
-        int kernelHandle = _terraformCS.FindKernel("Terraform");
-        _terraformCS.SetBuffer(kernelHandle, "points", _pointsBuffer);
-        _terraformCS.SetVector("hit", hit);
-        _terraformCS.SetFloats("chunkOrigin", chunk._chunkObject.transform.position.x,
-                                              chunk._chunkObject.transform.position.y,
-                                              chunk._chunkObject.transform.position.z);
-        _terraformCS.SetInt("numPointsPerAxis", _numPointsPerAxis);
-        _terraformCS.SetFloat("chunkSize", _chunkSize);
-        _terraformCS.SetFloat("radiusTerraform", _radiusTerraform);
-        _terraformCS.SetBool("actionType", type == 1.0f); // If type is 1 -> create terrain, else destroy terrain
-
-        // Dispatch the compute shader for terraforming
-        int numGroupThreads = Mathf.CeilToInt(_numPointsPerAxis / 8f);
-        _terraformCS.Dispatch(kernelHandle, numGroupThreads, numGroupThreads, numGroupThreads);
-
-        // Obtain the processed points from the compute buffer
-        Vector4[] processedPoints = new Vector4[_numPointsPerAxis * _numPointsPerAxis * _numPointsPerAxis];
-        _pointsBuffer.GetData(processedPoints);
-        chunk.SetPoints(processedPoints);
-
-        // Create spheres for visualization if needed
-        CreateSpheres(chunk);
-
-        // Recreate the mesh with the updated points
-        Polygonize(chunk);
-
-        // Clean up the points buffer
-        if (_pointsBuffer != null)
+        foreach (var chunk in chunkDict.Values)
         {
-            _pointsBuffer.Release();
-            _pointsBuffer = null;
-        }
+            float time = Time.realtimeSinceStartup;
 
-        Debug.Log($"Terraforming completed in {Time.realtimeSinceStartup - time} seconds for chunk {chunk.id}.");
+            Debug.Log($"Terraforming chunk {chunk.id} with type {type} at position {hit}.");
+
+            if (_pointsBuffer != null)
+                _pointsBuffer.Release();
+
+            // Initialize the compute buffer with the points data
+            _pointsBuffer = new ComputeBuffer(_numPointsPerAxis * _numPointsPerAxis * _numPointsPerAxis, sizeof(float) * 4);
+            _pointsBuffer.SetData(chunk.GetPoints());
+
+            // Set the compute shader parameters for terraforming
+            int kernelHandle = _terraformCS.FindKernel("Terraform");
+            _terraformCS.SetBuffer(kernelHandle, "points", _pointsBuffer);
+            _terraformCS.SetVector("hit", hit);
+            _terraformCS.SetFloats("chunkOrigin", chunk._chunkObject.transform.position.x,
+                                                  chunk._chunkObject.transform.position.y,
+                                                  chunk._chunkObject.transform.position.z);
+            _terraformCS.SetInt("numPointsPerAxis", _numPointsPerAxis);
+            _terraformCS.SetFloat("chunkSize", _chunkSize);
+            _terraformCS.SetFloat("radiusTerraform", _radiusTerraform);
+            _terraformCS.SetBool("actionType", type == 1.0f); // If type is 1 -> create terrain, else destroy terrain
+
+            // Dispatch the compute shader for terraforming
+            int numGroupThreads = Mathf.CeilToInt(_numPointsPerAxis / 8f);
+            _terraformCS.Dispatch(kernelHandle, numGroupThreads, numGroupThreads, numGroupThreads);
+
+            // Obtain the processed points from the compute buffer
+            Vector4[] processedPoints = new Vector4[_numPointsPerAxis * _numPointsPerAxis * _numPointsPerAxis];
+            _pointsBuffer.GetData(processedPoints);
+            chunk.SetPoints(processedPoints);
+
+            // Create spheres for visualization if needed
+            CreateSpheres(chunk);
+
+            // Recreate the mesh with the updated points
+            Polygonize(chunk);
+
+            // Clean up the points buffer
+            if (_pointsBuffer != null)
+            {
+                _pointsBuffer.Release();
+                _pointsBuffer = null;
+            }
+
+            Debug.Log($"Terraforming completed in {Time.realtimeSinceStartup - time} seconds for chunk {chunk.id}.");
+        }
     }
 
     private void CreateSpheres(Chunk chunk)
