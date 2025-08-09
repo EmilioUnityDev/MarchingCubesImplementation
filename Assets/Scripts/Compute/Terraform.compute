@@ -1,0 +1,46 @@
+#pragma kernel Terraform
+
+RWStructuredBuffer<float4> points;
+
+float3 hit;
+float3 chunkOrigin;
+int numPointsPerAxis;
+float chunkSize;
+float radiusTerraform;
+bool actionType; // True for creating, false for mining
+
+float DistanceToHit(float3 p)
+{
+    return abs(length(p - hit));
+}
+
+float EaseOutExpo(float x)
+{
+    return x >= 1 ? 0 : 1 - pow(2.0f, 5.0f * (x - 1.0f));
+}
+
+[numthreads(8,8,8)]
+void Terraform(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= numPointsPerAxis || id.y >= numPointsPerAxis || id.z >= numPointsPerAxis)
+        return;
+    
+    int index = id.x + id.y * numPointsPerAxis + id.z * numPointsPerAxis * numPointsPerAxis;
+    
+    float3 posInChunk = float3( // Position of the point in the chunk [0,1] scalated to the chunk size [0, chunkSize]
+        ((float) id.x / (numPointsPerAxis - 1)) * chunkSize,
+        ((float) id.y / (numPointsPerAxis - 1)) * chunkSize,
+        ((float) id.z / (numPointsPerAxis - 1)) * chunkSize
+    );
+    
+    float3 posInWorld = posInChunk + chunkOrigin; // Position of the point in the world
+    
+    float modifiedIsoValue = actionType ? 
+        min(1.0f, points[index].w + EaseOutExpo(DistanceToHit(posInWorld) / radiusTerraform)) :
+        max(0.0f, points[index].w - EaseOutExpo(DistanceToHit(posInWorld) / radiusTerraform));
+        
+    points[index] = float4(
+        posInChunk,
+        modifiedIsoValue
+    );
+}

@@ -1,0 +1,25 @@
+#pragma kernel CSMain
+
+RWStructuredBuffer<float4> points;
+
+int numPointsPerAxis;
+
+[numthreads(8,8,8)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= numPointsPerAxis || id.y >= numPointsPerAxis || id.z >= numPointsPerAxis)
+        return;
+    
+    float3 pos = float3(
+        (float)id.x / (numPointsPerAxis - 1),
+        (float)id.y / (numPointsPerAxis - 1),
+        (float)id.z / (numPointsPerAxis - 1)
+    );
+
+    // Sustituye noise por una función válida
+    float value = sin(pos.x * 10.0 + pos.y * 10.0 + pos.z * 10.0);
+
+    points[id.x + id.y * numPointsPerAxis + id.z * numPointsPerAxis * numPointsPerAxis] = float4(
+        pos.x, pos.y, pos.z, value
+    );
+}

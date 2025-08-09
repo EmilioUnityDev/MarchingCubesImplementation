@@ -1,0 +1,64 @@
+#pragma kernel Noise
+ 
+RWStructuredBuffer<float4> points;
+int numPointsPerAxis;
+float chunkSize;
+float3 chunkOrigin;
+
+// Hash function
+float hash(float n)
+{
+    return frac(sin(n) * 43758.5453);
+}
+
+// Lerp function
+float lerp(float a, float b, float t)
+{
+    return a + t * (b - a);
+}
+
+// Noise3D function (adaptaci�n directa)
+float Noise3D(float3 x)
+{
+    float3 p = floor(x);
+    float3 f = (x - p);
+
+    // Smoothstep curve
+    f = (3.0 - 2.0 * f) * f * f;
+
+    float n = p.x + p.y * 57.0 + 113.0 * p.z;
+
+    float res = lerp(
+        lerp(
+            lerp(hash(n + 0.0), hash(n + 1.0), f.x),
+            lerp(hash(n + 57.0), hash(n + 58.0), f.x),
+            f.y
+        ),
+        lerp(
+            lerp(hash(n + 113.0), hash(n + 114.0), f.x),
+            lerp(hash(n + 170.0), hash(n + 171.0), f.x),
+            f.y
+        ),
+        f.z
+    );
+
+    return res; // [0,1]
+}
+
+[numthreads(8, 8, 8)]
+void Noise(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= numPointsPerAxis || id.y >= numPointsPerAxis || id.z >= numPointsPerAxis)
+        return;
+
+    float3 pos = float3(
+        ((float) id.x / (numPointsPerAxis - 1)) * chunkSize,
+        ((float) id.y / (numPointsPerAxis - 1)) * chunkSize,
+        ((float) id.z / (numPointsPerAxis - 1)) * chunkSize
+    );
+
+    float n = Noise3D(pos + chunkOrigin);
+
+    points[id.x + id.y * numPointsPerAxis + id.z * numPointsPerAxis * numPointsPerAxis] =
+        float4(pos, n);
+}

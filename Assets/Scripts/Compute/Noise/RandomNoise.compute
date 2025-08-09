@@ -1,0 +1,30 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel RandomNoise
+
+// Points buffer to store the result of the compute shader in the point.w component
+RWStructuredBuffer<float4> points;
+
+int numPointsPerAxis;
+float chunkSize;
+float3 chunkOrigin;
+
+float random(float2 uv)
+{
+    return frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453123);
+}
+
+[numthreads(8,8,8)]
+void RandomNoise (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= numPointsPerAxis || id.y >= numPointsPerAxis || id.z >= numPointsPerAxis)
+        return;
+    
+    points[id.x + id.y * numPointsPerAxis + id.z * numPointsPerAxis * numPointsPerAxis] = float4(
+        ((float) id.x / (numPointsPerAxis - 1)) * chunkSize,
+        ((float) id.y / (numPointsPerAxis - 1)) * chunkSize,
+        ((float) id.z / (numPointsPerAxis - 1)) * chunkSize,
+        random(float2(id.x + chunkOrigin.x, id.y + chunkOrigin.y) / numPointsPerAxis) *
+        random(float2(id.y + chunkOrigin.y, id.z + chunkOrigin.z) / numPointsPerAxis) *
+        random(float2(id.z + chunkOrigin.z, id.x + chunkOrigin.x) / numPointsPerAxis)
+    );
+}
