@@ -50,7 +50,7 @@ public class PlayerMovement : MonoBehaviour
             transform.Rotate(Vector3.up, mouseX);
 
             // Rotate the camera around the X-axis
-            playerCamera.transform.Rotate(Vector3.left, mouseY);
+            playerCamera.transform.Rotate(Vector3.left, Mathf.Clamp(mouseY, -90f, 90f)); // Clamp the vertical rotation to prevent flipping
 
             // In this part we prevent the camera from clipping through the terrain
             Vector3 cameraPosition = transform.position - playerCamera.transform.forward * cameraDistance; // Set the camera position behind the player
