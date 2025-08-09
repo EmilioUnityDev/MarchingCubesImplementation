@@ -95,7 +95,7 @@ public class MeshGenerator : MonoBehaviour
     // Variables for mesh generation
     [Space(10), Header("Mesh Generation Variables")]
     [SerializeField, Tooltip("Size of the mesh in chunks")]
-    public int _numChunks;
+    public Vector3Int _numChunks;
     [SerializeField, Tooltip("Size of each chunk")]
     public float _chunkSize;
     [SerializeField, Tooltip("Number of points of each axis"), Range(2, 50)]
@@ -198,13 +198,13 @@ public class MeshGenerator : MonoBehaviour
             }
         }
 
-        _chunks = new Chunk[_numChunks, _numChunks, _numChunks];
+        _chunks = new Chunk[_numChunks.x, _numChunks.y, _numChunks.z];
 
-        for (int x = 0; x < _numChunks; x++)
+        for (int x = 0; x < _numChunks.x; x++)
         {
-            for (int y = 0; y < _numChunks; y++)
+            for (int y = 0; y < _numChunks.y; y++)
             {
-                for (int z = 0; z < _numChunks; z++)
+                for (int z = 0; z < _numChunks.z; z++)
                 {
                     float time = Time.realtimeSinceStartup;
                     Chunk chunk = new(_chunkCollection, new Vector3Int(x, y, z), _chunkSize);
@@ -273,11 +273,7 @@ public class MeshGenerator : MonoBehaviour
         _smoothTopNoiseCS.SetBuffer(kernelHandle, "pointsNoise", pointsNoise);
         _smoothTopNoiseCS.SetInt("numPointsPerAxis", _numPointsPerAxis);
         _smoothTopNoiseCS.SetFloat("chunkSize", _chunkSize);
-        _smoothTopNoiseCS.SetInt("numChunks", _numChunks);
-        _smoothTopNoiseCS.SetFloats("chunkOrigin", chunk._chunkObject.transform.position.x,
-                                                   chunk._chunkObject.transform.position.y,
-                                                   chunk._chunkObject.transform.position.z);
-        _smoothTopNoiseCS.SetBool("isTopLayer", chunk.id.y == _numChunks - 1); // Check if it's the top layer
+        _smoothTopNoiseCS.SetBool("isTopLayer", chunk.id.y == _numChunks.y - 1); // Check if it's the top layer
         int numGroupThreads = Mathf.CeilToInt(_numPointsPerAxis / 8f);
         _smoothTopNoiseCS.Dispatch(kernelHandle, numGroupThreads, numGroupThreads, numGroupThreads);
 
