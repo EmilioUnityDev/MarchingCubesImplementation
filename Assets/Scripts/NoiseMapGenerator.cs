@@ -19,7 +19,7 @@ public class NoiseMapGenerator : MonoBehaviour
         }
     }
 
-    public static float[] GenerateNoiseMap(int width, int height, float numPointsPerAxis, float scale, Vector2 offset)
+    public static float[] GenerateNoiseMap(int width, int height, float scale, Vector2 chunkOrigin, int octaves, float persistence, float lacunarity)
     {
         float minValue = float.MaxValue;
         float maxValue = float.MinValue;
@@ -29,12 +29,23 @@ public class NoiseMapGenerator : MonoBehaviour
         {
             for (int y = 0; y < height; y++)
             {
-                float sampleX = (x + offset.x) / scale;
-                float sampleY = (y + offset.y) / scale;
+                float amplitude = 1f;
+                float frequency = 1f;
+                float noiseValue = 0f;
 
-                // Generate noise value using Perlin noise
-                float noiseValue = Mathf.PerlinNoise(sampleX, sampleY);
-                noiseMap[x + (y * height)] = noiseValue;
+                for (int octave = 0; octave < octaves; octave++)
+                {
+                    // Calculate the sample position based on frequency and amplitude
+                    float sampleX = ((x + chunkOrigin.x)) / scale * frequency;
+                    float sampleY = ((y + chunkOrigin.y)) / scale * frequency;
+
+                    // Generate noise value using Perlin noise
+                    noiseValue += (Mathf.PerlinNoise(sampleX, sampleY)) * amplitude;
+
+                    // Update amplitude and frequency for the next octave
+                    amplitude *= persistence;
+                    frequency *= lacunarity;
+                }
 
                 // Track min and max values for normalization
                 if (noiseValue < minValue)
@@ -45,7 +56,16 @@ public class NoiseMapGenerator : MonoBehaviour
                 {
                     maxValue = noiseValue;
                 }
+
+                // Store the noise value in the map
+                noiseMap[x + (y * height)] = noiseValue;
             }
+        }
+
+        // Normalize the noise values to the range [0, 1]
+        for (int i = 0; i < noiseMap.Length; i++)
+        {
+            noiseMap[i] = Mathf.InverseLerp(-5f, 5f, noiseMap[i]);
         }
 
         Debug.Log($"Min Value: {minValue}, Max Value: {maxValue}");

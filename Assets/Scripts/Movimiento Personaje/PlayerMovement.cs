@@ -52,10 +52,8 @@ public class PlayerMovement : MonoBehaviour
             // Rotate the camera around the X-axis
             playerCamera.transform.Rotate(Vector3.left, mouseY);
 
-            // Clamp the camera's rotation to prevent flipping
-            Vector3 cameraRotation = new(playerCamera.transform.localEulerAngles.x, 0, 0);
-            Debug.Log($"Camera Rotation: {cameraRotation}");
             // Clamp the camera's vertical rotation to prevent flipping [270 - 360] and [0 - 90]
+            Vector3 cameraRotation = new(playerCamera.transform.localEulerAngles.x, 0, 0);
             cameraRotation.x = Mathf.Clamp((cameraRotation.x + 90) % 360, 0f, 180f) - 90f;
             playerCamera.transform.localEulerAngles = cameraRotation;
 

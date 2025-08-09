@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Unity.Mathematics;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
@@ -108,6 +109,15 @@ public class MeshGenerator : MonoBehaviour
     [SerializeField, Tooltip("Terrain material")]
     private Material _terrainMaterial;
 
+    // Variables for noise generation
+    [Space(10), Header("Noise Generation Variables")]
+    [SerializeField, Tooltip("Number of octaves for the noise generation"), Range(1, 10)]
+    private int _numOctaves = 4;
+    [SerializeField, Tooltip("Persistence of the noise generation"), Range(0.0f, 1.0f)]
+    private float _persistance = 0.5f;
+    [SerializeField, Tooltip("Lacunarity of the noise generation"), Range(1.0f, 4.0f)]
+    private float _lacunarity = 2.0f;
+
     // Variables for terraforming
     [Space(10), Header("Terraforming Variables")]
     [SerializeField, Tooltip("Radius of the terraforming effect"), Range(0.1f, 1.0f)]
@@ -175,6 +185,9 @@ public class MeshGenerator : MonoBehaviour
             _changesApplied = true;
             DestroyAllSpheres(); // Clear existing spheres if any
             GenerateMesh();
+
+            // Place the chunk collection in the world
+            _chunkCollection.transform.position = -Vector3.up * _chunkSize * (_numChunks.y - 0.25f); // Center the chunk collection in the world
         }
     }
 
@@ -265,7 +278,8 @@ public class MeshGenerator : MonoBehaviour
         //_randomNoiseCS.Dispatch(kernelHandle, numGroupThreads, numGroupThreads, numGroupThreads);
 
         // Create a point noise buffer
-        float[] pointsNoiseData = NoiseMapGenerator.GenerateNoiseMap(_numPointsPerAxis, _numPointsPerAxis, _numPointsPerAxis, _chunkSize, new Vector2(chunk.id.x * (_numPointsPerAxis - 1), chunk.id.z * (_numPointsPerAxis - 1)));
+        float2 chunkOrigin = new Vector2(chunk.id.x * (_numPointsPerAxis - 1), chunk.id.z * (_numPointsPerAxis - 1));
+        float[] pointsNoiseData = NoiseMapGenerator.GenerateNoiseMap(_numPointsPerAxis, _numPointsPerAxis, _chunkSize, chunkOrigin, _numOctaves, _persistance, _lacunarity);
         ComputeBuffer pointsNoise = new ComputeBuffer(_numPointsPerAxis * _numPointsPerAxis, sizeof(float));
         pointsNoise.SetData(pointsNoiseData);
 
