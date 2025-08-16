@@ -54,10 +54,10 @@ public class MeshGenerator : MonoBehaviour
 
             // Set the parent of the chunk object to the chunk collection
             _chunkObject.transform.parent = chunkCollection.transform;
-            Debug.Log($"Chunk created with ID: {id} at position: {_chunkObject.transform.position}");
+            // Debug.Log($"Chunk created with ID: {id} at position: {_chunkObject.transform.position}");
             // Set the position of the chunk based on its ID and the chunk size
             _chunkObject.transform.localPosition = new Vector3(id.x * chunkSize, id.y * chunkSize, id.z * chunkSize);
-            Debug.Log($"Chunk {id} LocalPosition set to: {_chunkObject.transform.localPosition} and WorldPosition: {_chunkObject.transform.position}");
+            // Debug.Log($"Chunk {id} LocalPosition set to: {_chunkObject.transform.localPosition} and WorldPosition: {_chunkObject.transform.position}");
 
             meshFilter = _chunkObject.AddComponent<MeshFilter>();
             meshRenderer = _chunkObject.AddComponent<MeshRenderer>();
@@ -100,7 +100,7 @@ public class MeshGenerator : MonoBehaviour
     public Vector3Int _numChunks;
     [SerializeField, Tooltip("Size of each chunk")]
     public float _chunkSize;
-    [SerializeField, Tooltip("Number of points of each axis"), Range(2, 50)]
+    [SerializeField, Tooltip("Number of points of each axis"), Range(2, 200)]
     private int _numPointsPerAxis;
     [SerializeField, Tooltip("Collection of chunks")]
     private GameObject _chunkCollection;
@@ -109,14 +109,9 @@ public class MeshGenerator : MonoBehaviour
     [SerializeField, Tooltip("Terrain material")]
     private Material _terrainMaterial;
 
-    // Variables for noise generation
-    [Space(10), Header("Noise Generation Variables")]
-    [SerializeField, Tooltip("Number of octaves for the noise generation"), Range(1, 10)]
-    private int _numOctaves = 4;
-    [SerializeField, Tooltip("Persistence of the noise generation"), Range(0.0f, 1.0f)]
-    private float _persistance = 0.5f;
-    [SerializeField, Tooltip("Lacunarity of the noise generation"), Range(1.0f, 4.0f)]
-    private float _lacunarity = 2.0f;
+    [Space(10), Header("Noise Generator Reference")]
+    [SerializeReference, Tooltip("Noise Map Generator")]
+    private NoiseMapGenerator _noiseMapGenerator;
 
     // Variables for terraforming
     [Space(10), Header("Terraforming Variables")]
@@ -150,6 +145,7 @@ public class MeshGenerator : MonoBehaviour
 
     // Singleton instance
     private static MeshGenerator _instance;
+
     public static MeshGenerator Instance
     {
         get
@@ -158,7 +154,7 @@ public class MeshGenerator : MonoBehaviour
         }
     }
 
-    private void Awake()
+    void Awake()
     {
         if (_instance == null)
         {
@@ -176,6 +172,12 @@ public class MeshGenerator : MonoBehaviour
     {
         _changesApplied = false;
         Debug.Log("MeshGenerator: OnValidate called, asking for update.");
+    }
+
+    public void OnValidateNoiseGenerator()
+    {
+        _changesApplied = false;
+        Debug.Log("MeshGenerator: OnValidateNoiseGenerator called, asking for update.");
     }
 
     void Update()
@@ -224,9 +226,8 @@ public class MeshGenerator : MonoBehaviour
                     Chunk chunk = new(_chunkCollection, new Vector3Int(x, y, z), _chunkSize);
                     GenerateChunk(chunk);
                     _chunks[x, y, z] = chunk;
-                    //chunk.PlaceChunkInWorld(_chunkSize);
 
-                    Debug.Log($"Chunk {chunk.id} generated in {Time.realtimeSinceStartup - time} seconds.");
+                    // Debug.Log($"Chunk {chunk.id} generated in {Time.realtimeSinceStartup - time} seconds.");
                 }
             }
         }
@@ -278,8 +279,9 @@ public class MeshGenerator : MonoBehaviour
         //_randomNoiseCS.Dispatch(kernelHandle, numGroupThreads, numGroupThreads, numGroupThreads);
 
         // Create a point noise buffer
-        float2 chunkOrigin = new Vector2(chunk.id.x * (_numPointsPerAxis - 1), chunk.id.z * (_numPointsPerAxis - 1));
-        float[] pointsNoiseData = NoiseMapGenerator.GenerateNoiseMap(_numPointsPerAxis, _numPointsPerAxis, _chunkSize, chunkOrigin, _numOctaves, _persistance, _lacunarity);
+        Vector2 chunkOrigin = new (chunk._chunkObject.transform.position.x,
+                                   chunk._chunkObject.transform.position.z);
+        float[] pointsNoiseData = _noiseMapGenerator.GenerateNoiseMap(_numPointsPerAxis, _numPointsPerAxis, _chunkSize, chunkOrigin);
         ComputeBuffer pointsNoise = new ComputeBuffer(_numPointsPerAxis * _numPointsPerAxis, sizeof(float));
         pointsNoise.SetData(pointsNoiseData);
 
@@ -334,7 +336,7 @@ public class MeshGenerator : MonoBehaviour
 
         // Dispatch the compute shader
         int threadGroups = Mathf.CeilToInt(numVoxelsPerAxis / 8f);
-        Debug.Log($"Dispatching Marching Cubes with {threadGroups} thread groups.");
+        // Debug.Log($"Dispatching Marching Cubes with {threadGroups} thread groups.");
         _marchingCubesCS.Dispatch(kernelHandle, threadGroups, threadGroups, threadGroups);
 
         // Retrieve the triangles from the compute buffer
@@ -421,7 +423,7 @@ public class MeshGenerator : MonoBehaviour
                     if (_chunks[fixedNearbyChunkId.x, fixedNearbyChunkId.y, fixedNearbyChunkId.z] != null &&
                         !chunkDict.ContainsKey(fixedNearbyChunkId))
                     {
-                        Debug.Log($"Adding nearby chunk {fixedNearbyChunkId} to the dictionary.");
+                        // Debug.Log($"Adding nearby chunk {fixedNearbyChunkId} to the dictionary.");
 
                         // Add the nearby chunk to the dictionary
                         chunkDict[fixedNearbyChunkId] = _chunks[fixedNearbyChunkId.x, fixedNearbyChunkId.y, fixedNearbyChunkId.z];
@@ -434,7 +436,7 @@ public class MeshGenerator : MonoBehaviour
         {
             float time = Time.realtimeSinceStartup;
 
-            Debug.Log($"Terraforming chunk {chunk.id} with type {type} at position {hit}.");
+            // Debug.Log($"Terraforming chunk {chunk.id} with type {type} at position {hit}.");
 
             if (_pointsBuffer != null)
                 _pointsBuffer.Release();
