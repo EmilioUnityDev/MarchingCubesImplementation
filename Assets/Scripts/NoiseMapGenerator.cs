@@ -100,7 +100,7 @@ public class NoiseMapGenerator : MonoBehaviour
         // Normalize the noise values to the range [0, 1]
         for (int i = 0; i < noiseMap.Length; i++)
         {
-            noiseMap[i] = Mathf.InverseLerp(-5f, 5f, noiseMap[i]);
+            noiseMap[i] = Mathf.InverseLerp(-1.0f, 2.0f, noiseMap[i]);
         }
 
         // Debug.Log($"Min Value: {minValue}, Max Value: {maxValue}");

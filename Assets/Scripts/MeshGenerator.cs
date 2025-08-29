@@ -189,7 +189,7 @@ public class MeshGenerator : MonoBehaviour
             GenerateMesh();
 
             // Place the chunk collection in the world
-            _chunkCollection.transform.position = -Vector3.up * _chunkSize * (_numChunks.y - 0.25f); // Center the chunk collection in the world
+            //_chunkCollection.transform.position = -Vector3.up * _chunkSize * (_numChunks.y - 0.25f); // Center the chunk collection in the world
         }
     }
 
@@ -290,7 +290,8 @@ public class MeshGenerator : MonoBehaviour
         _smoothTopNoiseCS.SetBuffer(kernelHandle, "pointsNoise", pointsNoise);
         _smoothTopNoiseCS.SetInt("numPointsPerAxis", _numPointsPerAxis);
         _smoothTopNoiseCS.SetFloat("chunkSize", _chunkSize);
-        _smoothTopNoiseCS.SetBool("isTopLayer", chunk.id.y == _numChunks.y - 1); // Check if it's the top layer
+        _smoothTopNoiseCS.SetInt("idYChunk", chunk.id.y);
+        _smoothTopNoiseCS.SetInt("numChunksY", _numChunks.y);
         int numGroupThreads = Mathf.CeilToInt(_numPointsPerAxis / 8f);
         _smoothTopNoiseCS.Dispatch(kernelHandle, numGroupThreads, numGroupThreads, numGroupThreads);
 

@@ -6,7 +6,8 @@ StructuredBuffer<float2> pointsNoise;
 
 int numPointsPerAxis;
 float chunkSize;
-bool isTopLayer;
+int idYChunk;
+int numChunksY;
 
 float4 mod(float4 x, float4 y)
 {
@@ -73,6 +74,24 @@ float cnoise(float2 P)
     return 2.3 * n_xy;
 }
 
+float EaseOutInQuart(float x)
+{
+    return x < 0.5f ? 1.0f - (pow(-2.0f * (x + 1.0f) + 2.0f, 4.0f) / 2.0f) : 8.0f * pow(x - 1.0f, 4.0f);
+}
+
+float LinearOut(float x)
+{
+    return -x + 1.0f;
+}
+
+// Function for reducing noise values depending on the distance between noiseValueInWorld and posInWorldY
+float ReduceNoiseOverDistance(float noiseValueInWorld, float posInWorldY)
+{
+    float distance = posInWorldY - noiseValueInWorld; // Distance between the point position and the surface defined by the noise value [-1,1]
+    float distance01 = (distance + 1.0f) / 2.0f; // Distance mapped to [0,1]
+    return clamp(noiseValueInWorld * EaseOutInQuart(distance01), 0.0f, 1.0f); // Reduce noise value based on distance
+}
+
 [numthreads(8,8,8)]
 void SmoothTopNoise(uint3 id : SV_DispatchThreadID)
 {
@@ -87,33 +106,13 @@ void SmoothTopNoise(uint3 id : SV_DispatchThreadID)
         ((float) id.z / (numPointsPerAxis - 1)) * chunkSize
     );
     
-    if (!isTopLayer)
-    {
-        // If not on the top layer, set the point to one
-        points[index] = float4(
-            posInChunk,
-            1.0f // Set the iso value to 1
-        );
-        return;
-    }
-    else
-    {
-        float noiseValue = pointsNoise[id.x + id.z * numPointsPerAxis].x;
-        if ((float) id.y / (numPointsPerAxis - 1) < noiseValue)
-        {
-            // If the y position is less than the noise value, set the iso value to 1
-            points[index] = float4(
-                posInChunk,
-                1.0f // Set the iso value to 1
-            );
-        }
-        else
-        {
-            // Otherwise, set the iso value to 0
-            points[index] = float4(
-                posInChunk,
-                noiseValue // Set the iso value to the noise value
-            );
-        }
-    }
+    float noiseValueInWorld = pointsNoise[id.x + id.z * numPointsPerAxis].x; // Noise value for the current column
+    
+    float posInWorldY = (((float) id.y / (numPointsPerAxis - 1)) / (float) numChunksY) + ((float) idYChunk / (float) numChunksY); // Position of the point in the world [0,1]
+    //float posInWorldY = ((float) id.y / (numPointsPerAxis - 1)) / (float) numChunksY; // Position of the point in the world [0,1]
+    
+    points[index] = float4(
+        posInChunk,
+        ReduceNoiseOverDistance(noiseValueInWorld, posInWorldY) // Set the iso value to the noise value
+    );
 }
